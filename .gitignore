@@ -1,0 +1,43 @@
+# Ignore Python virtual environments
+venv/
+ENV/
+env/
+
+# Byte-compiled / cache files
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+
+# Ignore dotenv (if secrets are stored)
+.env
+*.env
+
+# Ignore model caches and large Hugging Face files
+*.bin
+*.pt
+*.ckpt
+*.h5
+transformers_cache/
+cache/
+huggingface/
+
+# Jupyter Notebook checkpoints (if used)
+.ipynb_checkpoints/
+
+# Streamlit config/state files
+.streamlit/
+
+# VSCode, PyCharm, etc.
+.vscode/
+.idea/
+
+# OS-specific
+.DS_Store
+Thumbs.db
+
+# Logs and temporary files
+*.log
+*.tmp
+*.swp

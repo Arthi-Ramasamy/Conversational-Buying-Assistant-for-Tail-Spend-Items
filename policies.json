@@ -1,0 +1,7 @@
+{
+    "max_budget": 1000,
+    "approved_vendors": ["Amazon", "Flipkart"],
+    "approved_categories": ["Office Chairs", "Office Desks", "Monitors", "Laptops", "Keyboards"],
+    "approval_threshold": 85,
+    "require_approval_above": 500
+}
