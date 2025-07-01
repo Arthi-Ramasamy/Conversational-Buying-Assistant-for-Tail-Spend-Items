@@ -1,20 +1,18 @@
-# Ignore Python virtual environments
+# === Python backend ===
 venv/
 ENV/
 env/
-
-# Byte-compiled / cache files
 __pycache__/
 *.py[cod]
 *.pyo
 *.pyd
 *.so
 
-# Ignore dotenv (if secrets are stored)
+# Dotenv / secrets
 .env
 *.env
 
-# Ignore model caches and large Hugging Face files
+# Model and cache files
 *.bin
 *.pt
 *.ckpt
@@ -23,21 +21,37 @@ transformers_cache/
 cache/
 huggingface/
 
-# Jupyter Notebook checkpoints (if used)
-.ipynb_checkpoints/
-
-# Streamlit config/state files
+# Streamlit state/config
 .streamlit/
 
-# VSCode, PyCharm, etc.
-.vscode/
-.idea/
+# Jupyter Notebooks
+.ipynb_checkpoints/
 
-# OS-specific
-.DS_Store
-Thumbs.db
-
-# Logs and temporary files
+# Logs and temp files
 *.log
 *.tmp
 *.swp
+
+# === React frontend (Node.js) ===
+node_modules/
+build/
+dist/
+.cache/
+.npm/
+.npmrc
+.yarn-cache/
+.yarn/
+.pnp.*
+*.tgz
+
+# React environment files
+.env.local
+.env.development
+.env.test
+.env.production
+
+# === IDE and system-specific ===
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
