@@ -148,15 +148,61 @@ def check_clarity(context):
     required_slots = ["budget", "purpose", "brand", "features", "urgency"]
     return [slot for slot in required_slots if context.get(slot) is None]
 
-def generate_clarification_question(missing_slot):
-    questions = {
-        "budget": "What's your approximate budget for this purchase?",
-        "purpose": "What will you be using the item for? (e.g., college work, gaming)",
-        "brand": "Do you have any brand preferences?",
-        "features": "Are there specific features you need? (e.g., screen size, RAM)",
-        "urgency": "How soon do you need the item delivered?"
+def generate_clarification_question(missing_slot, item=None):
+    # Product-specific clarification questions
+    product_questions = {
+        "office chair": {
+            "budget": "What’s your approximate budget for the office chair?",
+            "purpose": "What will you use the office chair for? (e.g., long hours of work, home office, occasional use)",
+            "brand": "Do you prefer any specific brand for the office chair? (e.g., Herman Miller, Steelcase)",
+            "features": "What features are important for the office chair? (e.g., ergonomic design, lumbar support, adjustable height)",
+            "urgency": "How soon do you need the office chair delivered?"
+        },
+        "desk": {
+            "budget": "What’s your approximate budget for the desk?",
+            "purpose": "What will you use the desk for? (e.g., office work, studying, standing desk use)",
+            "brand": "Do you have a preferred brand for the desk? (e.g., IKEA, Uplift)",
+            "features": "What features do you need in the desk? (e.g., adjustable height, storage drawers, size)",
+            "urgency": "How soon do you need the desk delivered?"
+        },
+        "keyboard": {
+            "budget": "What’s your approximate budget for the keyboard?",
+            "purpose": "What will you use the keyboard for? (e.g., typing, gaming, programming)",
+            "brand": "Do you prefer any specific brand for the keyboard? (e.g., Logitech, Razer)",
+            "features": "What features are important for the keyboard? (e.g., mechanical, wireless, backlighting)",
+            "urgency": "How soon do you need the keyboard delivered?"
+        },
+        "monitor": {
+            "budget": "What’s your approximate budget for the monitor?",
+            "purpose": "What will you use the monitor for? (e.g., office work, graphic design, gaming)",
+            "brand": "Do you have a preferred brand for the monitor? (e.g., Dell, Samsung)",
+            "features": "What features do you need in the monitor? (e.g., screen size, resolution, refresh rate)",
+            "urgency": "How soon do you need the monitor delivered?"
+        },
+        "laptop": {
+            "budget": "What’s your approximate budget for the laptop?",
+            "purpose": "What will you use the laptop for? (e.g., college work, gaming, professional tasks)",
+            "brand": "Do you prefer any specific brand for the laptop? (e.g., Apple, Dell, Lenovo)",
+            "features": "What features are important for the laptop? (e.g., processor speed, RAM, storage capacity)",
+            "urgency": "How soon do you need the laptop delivered?"
+        }
     }
-    return questions.get(missing_slot, "Could you provide more details about your request?")
+
+    # Normalize item and match with priority
+    item = item.lower().strip() if item else None
+    if item:
+        for product in product_questions:
+            if product in item or item in product:
+                return product_questions[product].get(missing_slot, f"Could you provide more details about the {item}?")
+    
+    # Generic questions with no irrelevant features
+    return {
+        "budget": "What’s your approximate budget for this purchase?",
+        "purpose": "What will you use the item for? (e.g., work, gaming, studying)",
+        "brand": "Do you have any brand preferences?",
+        "features": "What features are important for this item? (e.g., design, functionality)",
+        "urgency": "How soon do you need the item delivered?"
+    }.get(missing_slot, "Could you provide more details about your request?")
 
 def interpret_response(user_input, current_slot):
     if current_slot == "budget":
@@ -223,8 +269,8 @@ def submit_request():
                 "context": context.copy()
             })
         else:
-            # If the input is invalid, ask again for the same slot
-            response = generate_clarification_question(current_slot)
+            # If the input is invalid, ask again for the same slot with product-specific question
+            response = generate_clarification_question(current_slot, context.get("item"))
             sessions[session_id]["history"].append({
                 "user": user_input,
                 "bot": response,
@@ -259,7 +305,7 @@ def submit_request():
     missing_slots = check_clarity(context)
     if missing_slots:
         next_slot = missing_slots[0]
-        response = generate_clarification_question(next_slot)
+        response = generate_clarification_question(next_slot, context.get("item"))
         sessions[session_id]["history"].append({
             "user": user_input,
             "bot": response,
