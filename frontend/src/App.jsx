@@ -6,6 +6,8 @@ import {
 } from '@mui/material';
 import SendIcon from '@mui/icons-material/Send';
 import RestartAltIcon from '@mui/icons-material/RestartAlt';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 
 const darkTheme = createTheme({
   palette: {
@@ -143,6 +145,62 @@ function App() {
                   });
                   tableData.push(entry);
                 });
+
+                // Extract text before and after the table
+                const [beforeTable, afterTable] = msg.text.split(tableMatch[0]);
+                const preTableText = beforeTable.trim();
+                const explanationText = afterTable ? afterTable.trim() : '';
+
+                return (
+                  <Box key={idx} display="flex" justifyContent="flex-start" mb={1}>
+                    <Box
+                      sx={{
+                        bgcolor: 'grey.800',
+                        color: '#eee',
+                        p: 1.5,
+                        borderRadius: 2,
+                        maxWidth: '80%',
+                        whiteSpace: 'pre-wrap',
+                        overflowX: 'auto'
+                      }}
+                    >
+                      {preTableText && (
+                        <Typography variant="body2" sx={{ mb: 1 }}>
+                          {preTableText}
+                        </Typography>
+                      )}
+                      <Table size="small" sx={{ backgroundColor: '#212121', borderRadius: 1, mb: 2 }}>
+                        <TableHead>
+                          <TableRow>
+                            {Object.keys(tableData[0]).map((header) => (
+                              <TableCell key={header} sx={{ color: '#90caf9' }}>{header}</TableCell>
+                            ))}
+                          </TableRow>
+                        </TableHead>
+                        <TableBody>
+                          {tableData.map((row, rIdx) => (
+                            <TableRow key={rIdx} sx={bestProduct && row.Title === bestProduct.title ? { backgroundColor: '#2e7d32' } : {}}>
+                              {Object.entries(row).map(([key, value], cIdx) => (
+                                <TableCell key={cIdx} sx={{ color: '#fff' }}>
+                                  {key === 'Link' && value.includes('http') ? (
+                                    <a href={value.match(/\((.*?)\)/)?.[1]} target="_blank" rel="noreferrer" style={{ color: '#90caf9' }}>
+                                      View
+                                    </a>
+                                  ) : (
+                                    value
+                                  )}
+                                </TableCell>
+                              ))}
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                      {explanationText && (
+                        <ReactMarkdown remarkPlugins={[remarkGfm]}>{explanationText}</ReactMarkdown>
+                      )}
+                    </Box>
+                  </Box>
+                );
               }
 
               return (
@@ -158,41 +216,7 @@ function App() {
                       overflowX: 'auto'
                     }}
                   >
-                    {tableData.length > 0 ? (
-                      <>
-                        <Typography variant="body2" sx={{ mb: 1 }}>
-                          {msg.text.split('| Title |')[0].trim()}
-                        </Typography>
-                        <Table size="small" sx={{ backgroundColor: '#212121', borderRadius: 1 }}>
-                          <TableHead>
-                            <TableRow>
-                              {Object.keys(tableData[0]).map((header) => (
-                                <TableCell key={header} sx={{ color: '#90caf9' }}>{header}</TableCell>
-                              ))}
-                            </TableRow>
-                          </TableHead>
-                          <TableBody>
-                            {tableData.map((row, rIdx) => (
-                              <TableRow key={rIdx} sx={bestProduct && row.Title === bestProduct.title ? { backgroundColor: '#2e7d32' } : {}}>
-                                {Object.entries(row).map(([key, value], cIdx) => (
-                                  <TableCell key={cIdx} sx={{ color: '#fff' }}>
-                                    {key === 'Link' && value.includes('http') ? (
-                                      <a href={value.match(/\((.*?)\)/)?.[1]} target="_blank" rel="noreferrer" style={{ color: '#90caf9' }}>
-                                        View
-                                      </a>
-                                    ) : (
-                                      value
-                                    )}
-                                  </TableCell>
-                                ))}
-                              </TableRow>
-                            ))}
-                          </TableBody>
-                        </Table>
-                      </>
-                    ) : (
-                      msg.text
-                    )}
+                    <Typography variant="body2">{msg.text}</Typography>
                   </Box>
                 </Box>
               );
