@@ -27,7 +27,7 @@ APPROVER_EMAIL = os.getenv("APPROVER_EMAIL") if dotenv_available else "approver@
 # Set page configuration
 st.set_page_config(page_title="Conversational Buying Assistant", page_icon="🛍️")
 
-# Initialize Flan-T5-Large model with error handling
+# Initialize BART-large model with error handling
 @st.cache_resource
 def load_model():
     try:
@@ -103,7 +103,6 @@ def get_products(item, budget):
     except Exception as e:
         return [{"title": "Error", "price": 0, "description": f"Error: {str(e)}", "link": "#", "availability": "N/A", "delivery_time": "N/A", "product_id": str(uuid.uuid4())}]
 
-
 def extract_details(user_input):
     if generator is None:
         return None, None, None, None
@@ -150,15 +149,61 @@ def check_clarity(context):
     missing_slots = [slot for slot in required_slots if context.get(slot) is None]
     return missing_slots
 
-def generate_clarification_question(missing_slot):
-    questions = {
-        "budget": "What's your approximate budget for this purchase?",
-        "purpose": "What will you be using the item for? (e.g., college work, gaming)",
-        "brand": "Do you have any brand preferences?",
-        "features": "Are there specific features you need? (e.g., screen size, RAM)",
-        "urgency": "How soon do you need the item delivered?"
+def generate_clarification_question(missing_slot, item=None):
+    # Product-specific clarification questions
+    product_questions = {
+        "office chair": {
+            "budget": "What’s your approximate budget for the office chair?",
+            "purpose": "What will you use the office chair for? (e.g., long hours of work, home office, occasional use)",
+            "brand": "Do you prefer any specific brand for the office chair? (e.g., Herman Miller, Steelcase)",
+            "features": "What features are important for the office chair? (e.g., ergonomic design, lumbar support, adjustable height)",
+            "urgency": "How soon do you need the office chair delivered?"
+        },
+        "desk": {
+            "budget": "What’s your approximate budget for the desk?",
+            "purpose": "What will you use the desk for? (e.g., office work, studying, standing desk use)",
+            "brand": "Do you have a preferred brand for the desk? (e.g., IKEA, Uplift)",
+            "features": "What features do you need in the desk? (e.g., adjustable height, storage drawers, size)",
+            "urgency": "How soon do you need the desk delivered?"
+        },
+        "keyboard": {
+            "budget": "What’s your approximate budget for the keyboard?",
+            "purpose": "What will you use the keyboard for? (e.g., typing, gaming, programming)",
+            "brand": "Do you prefer any specific brand for the keyboard? (e.g., Logitech, Razer)",
+            "features": "What features are important for the keyboard? (e.g., mechanical, wireless, backlighting)",
+            "urgency": "How soon do you need the keyboard delivered?"
+        },
+        "monitor": {
+            "budget": "What’s your approximate budget for the monitor?",
+            "purpose": "What will you use the monitor for? (e.g., office work, graphic design, gaming)",
+            "brand": "Do you have a preferred brand for the monitor? (e.g., Dell, Samsung)",
+            "features": "What features do you need in the monitor? (e.g., screen size, resolution, refresh rate)",
+            "urgency": "How soon do you need the monitor delivered?"
+        },
+        "laptop": {
+            "budget": "What’s your approximate budget for the laptop?",
+            "purpose": "What will you use the laptop for? (e.g., college work, gaming, professional tasks)",
+            "brand": "Do you prefer any specific brand for the laptop? (e.g., Apple, Dell, Lenovo)",
+            "features": "What features are important for the laptop? (e.g., processor speed, RAM, storage capacity)",
+            "urgency": "How soon do you need the laptop delivered?"
+        }
     }
-    return questions.get(missing_slot, "Could you provide more details about your request?")
+
+    # Normalize item and match with priority
+    item = item.lower().strip() if item else None
+    if item:
+        for product in product_questions:
+            if product in item or item in product:
+                return product_questions[product].get(missing_slot, f"Could you provide more details about the {item}?")
+    
+    # Generic questions with no irrelevant features
+    return {
+        "budget": "What’s your approximate budget for this purchase?",
+        "purpose": "What will you use the item for? (e.g., work, gaming, studying)",
+        "brand": "Do you have any brand preferences?",
+        "features": "What features are important for this item? (e.g., design, functionality)",
+        "urgency": "How soon do you need the item delivered?"
+    }.get(missing_slot, "Could you provide more details about your request?")
 
 def interpret_response(user_input, current_slot):
     if current_slot == "budget":
@@ -234,7 +279,7 @@ def send_approval_email(product, match_score):
     except Exception as e:
         st.error(f"Failed to send approval email via SMTP: {str(e)}")
 
-                # Fallback to mailto link
+        # Fallback to mailto link
         encoded_subject = subject.replace(" ", "%20")
         encoded_body = body.replace(" ", "%20").replace("\n", "%0A")
 
@@ -262,7 +307,7 @@ def generate_response(user_input, context, intent, current_slot=None):
                 context[current_slot] = value
             missing_slots = check_clarity(context)
             if missing_slots:
-                return generate_clarification_question(missing_slots[0]), missing_slots[0]
+                return generate_clarification_question(missing_slots[0], context["item"]), missing_slots[0]
             else:
                 products = get_products(context["item"], context["budget"])
                 if products and "Error" not in products[0]["title"]:
@@ -270,7 +315,7 @@ def generate_response(user_input, context, intent, current_slot=None):
                     for p in products:
                         p["match_score"] = score_product(p, context)
 
-                    # Build table with Match Score column
+                    # Build table with Match Score column using database data
                     table = "| Title | Price | Match Score | Link | Availability | Delivery Time |\n"
                     table += "|-------|-------|-------------|------|--------------|---------------|\n"
                     for p in products:
@@ -279,10 +324,8 @@ def generate_response(user_input, context, intent, current_slot=None):
                     # Choose best product by highest match score
                     best_product = max(products, key=lambda x: x["match_score"])
 
-                    # Format response with match score below Best Choice
-                    explanation = f"\n\n**Best Choice:** \"{best_product['title']}\" because it best fits your budget and purpose.\n**Match Score:** {best_product['match_score']:.2f}"
-
-                    # Check company policy
+                    # Use database data for response
+                    explanation = f"\n\n**Best Choice:** \"{best_product['title']}\" because it best fits your budget (${context['budget']:.2f}) and purpose ('{context['purpose']}')."
                     passes_policy, reason = passes_company_policy(best_product)
                     if not passes_policy:
                         explanation += f"\n\nThis product requires approval: {reason}"
@@ -292,7 +335,7 @@ def generate_response(user_input, context, intent, current_slot=None):
                     st.session_state["passes_policy"] = passes_policy
                     st.session_state["policy_reason"] = reason
 
-                    return f"Thank you! Here are some options for a {context['item']} for {context['purpose']} with a budget of ${context['budget']:.2f}:\n\n{table}{explanation}", None
+                    return f"Thank you! Here are some options for a {context['item']}:\n\n{table}{explanation}", None
 
                 return f"No suitable {context['item']} found under ${context['budget']:.2f}. Please adjust your budget or try again.", None
         else:
@@ -309,7 +352,7 @@ def generate_response(user_input, context, intent, current_slot=None):
                 })
                 missing_slots = check_clarity(context)
                 if missing_slots:
-                    return generate_clarification_question(missing_slots[0]), missing_slots[0]
+                    return generate_clarification_question(missing_slots[0], context["item"]), missing_slots[0]
                 products = get_products(context["item"], context["budget"])
                 if products and "Error" not in products[0]["title"]:
                     for p in products:
@@ -321,8 +364,7 @@ def generate_response(user_input, context, intent, current_slot=None):
                         table += f"| {p['title']} | ${p['price']:.2f} | {p['match_score']:.2f} | [View]({p['link']}) | {p['availability']} | {p['delivery_time']} |\n"
 
                     best_product = max(products, key=lambda x: x["match_score"])
-                    explanation = f"\n\n**Best Choice:** \"{best_product['title']}\" because it best fits your budget and purpose.\n**Match Score:** {best_product['match_score']:.2f}"
-
+                    explanation = f"\n\n**Best Choice:** \"{best_product['title']}\" because it best fits your budget (${context['budget']:.2f}) and purpose ('{context['purpose']}')."
                     passes_policy, reason = passes_company_policy(best_product)
                     if not passes_policy:
                         explanation += f"\n\nThis product requires approval: {reason}"
@@ -331,7 +373,7 @@ def generate_response(user_input, context, intent, current_slot=None):
                     st.session_state["passes_policy"] = passes_policy
                     st.session_state["policy_reason"] = reason
 
-                    return f"Thank you! Here are some options for a {context['item']} for {context['purpose']} with a budget of ${context['budget']:.2f}:\n\n{table}{explanation}", None
+                    return f"Thank you! Here are some options for a {context['item']}:\n\n{table}{explanation}", None
                 return f"No suitable {context['item']} found under ${context['budget']:.2f}. Please adjust your budget or try again.", None
     elif intent == "greeting":
         prompt = f"""You are a procurement chatbot. The user said: '{user_input}'. Respond politely and offer assistance."""

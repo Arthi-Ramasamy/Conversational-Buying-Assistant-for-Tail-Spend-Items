@@ -1,48 +1,59 @@
-import json
 import random
+import json
+from bs4 import BeautifulSoup
+import requests
 
-categories = {
-    "Office Chairs": ["Ergonomic Chair", "Task Chair", "Mesh Chair", "Executive Chair", "Adjustable Stool"],
-    "Office Desks": ["Standing Desk", "Portable Desk", "L-Shaped Desk", "Gaming Desk", "Foldable Desk"],
-    "Monitors": ["24-Inch Monitor", "27-Inch Monitor", "32-Inch Monitor", "Curved Monitor", "Portable Monitor"],
-    "Laptops": ["Lightweight Laptop", "Gaming Laptop", "Business Laptop", "Ultrabook", "Convertible Laptop"],
-    "Keyboards": ["Mechanical Keyboard", "Wireless Keyboard", "Ergonomic Keyboard", "RGB Keyboard", "Compact Keyboard"]
-}
-descriptions = {
-    "Office Chairs": ["with lumbar support", "adjustable height", "breathable mesh", "with headrest", "reclining feature"],
-    "Office Desks": ["height-adjustable", "easy assembly", "with storage", "modern design", "portable"],
-    "Monitors": ["Full HD", "energy-efficient", "4K resolution", "with speakers", "ultra-thin bezel"],
-    "Laptops": ["high performance", "long battery life", "touchscreen", "lightweight", "dedicated GPU"],
-    "Keyboards": ["clicky switches", "silent typing", "customizable keys", "durable build", "backlit"]
-}
+# Define price ranges for different categories
 price_ranges = {
-    "Office Chairs": (100, 500),
-    "Office Desks": (200, 600),
-    "Monitors": (150, 400),
-    "Laptops": (500, 2000),
-    "Keyboards": (50, 150)
+    "laptop": (300, 2000),
+    "headphones": (20, 150),
+    "keyboard": (30, 100),
+    "mouse": (10, 50),
+    "monitor": (100, 500)
 }
-availability = ["In Stock", "Out of Stock", "Available in 3 days"]
-delivery_time = ["1-2 days", "3-5 days", "5-7 days"]
 
-products = []
-for category, items in categories.items():
-    for i, item in enumerate(items, 1):
-        for j in range(3):  # Generate 3 variants per item
-            title = f"{item} {i:03d}-{j+1}"
-            price = round(random.uniform(price_ranges[category][0], price_ranges[category][1]), 2)
-            description = f"{item} {random.choice(descriptions[category])}"
-            available = random.choice(availability)
-            delivery = random.choice(delivery_time)
-            products.append({
-                "title": title,
-                "price": price,
-                "description": description,
-                "availability": available,
-                "delivery_time": delivery,
-                "category": category,
-                "link": "https://example.com/product/placeholder"  # Placeholder until scraping
-            })
+def scrape_product_info(category, max_price, purpose, preferences):
+    try:
+        # Example URL (replace with actual scraping target)
+        url = f"https://example.com/search?q={category}"
+        response = requests.get(url, timeout=10)
+        response.raise_for_status()
+        soup = BeautifulSoup(response.text, 'html.parser')
+        
+        # Placeholder for scraping logic (adjust based on actual site structure)
+        products = []
+        for item in soup.select('.product-item'):  # Adjust selector
+            name = item.select_one('.product-name').text.strip()
+            price_text = item.select_one('.product-price').text.strip().replace('$', '')
+            price = float(price_text)
+            if price <= max_price:
+                # Simulate delivery info (replace with actual scraping)
+                delivery_text = "Free delivery"  # Example
+                products.append({"name": name, "price": price, "delivery": delivery_text})
+        return products
+    except Exception:
+        print(f"Web scraping failed for {category}: Unable to retrieve data. Returning empty list.")
+        return []
 
-with open("catalog.json", "w") as f:
-    json.dump(products, f, indent=2)
+def generate_dynamic_catalog(category, max_price, purpose, preferences):
+    # Scrape initial product data
+    products = scrape_product_info(category, max_price, purpose, preferences)
+    
+    if not products:
+        # Fallback to synthetic data if scraping fails
+        products = [{"name": f"{category} {i+1}", "price": round(random.uniform(price_ranges.get(category, (100, 500))[0], price_ranges.get(category, (100, 500))[1])), "delivery": "Free delivery"} for i in range(5)]
+    
+    # Filter and enhance based on purpose and preferences
+    filtered_products = []
+    for product in products:
+        if "high performance" in preferences.lower() and product["price"] < max_price * 0.7:
+            continue  # Skip low-end items for high performance
+        if "long battery life" in preferences.lower() and random.random() > 0.3:  # 70% chance to include
+            product["features"] = "Long battery life"
+        filtered_products.append(product)
+    
+    return filtered_products
+
+if __name__ == "__main__":
+    sample_catalog = generate_dynamic_catalog("laptop", 1000, "college work", "high performance, long battery life")
+    print(json.dumps(sample_catalog, indent=2))
