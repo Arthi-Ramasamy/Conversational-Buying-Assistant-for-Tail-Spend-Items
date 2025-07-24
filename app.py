@@ -128,21 +128,62 @@ def generate_catalog():
 
 catalog = generate_catalog()
 
-def extract_details(user_input):
-    intent = "purchase_request" if any(keyword in user_input.lower() for keyword in ["need", "buy", "purchase", "want", "get"]) else "general_query"
-    
-    if intent == "purchase_request":
-        item_match = re.search(r"(?:I need|I want|buy|get|purchase)\s*(?:a|an)?\s*([\w\s]+?)(?=\s*(?:under|below|less than|for|to use for|$)|\s*$)", user_input, re.IGNORECASE)
-        item = item_match.group(1).strip() if item_match else ""
-        
-        budget_match = re.search(r"(?:under|below|less than|for)\s*\$?(\d+\.?\d*)", user_input, re.IGNORECASE)
-        budget = float(budget_match.group(1)) if budget_match else None
-        
-        purpose_match = re.search(r"(?:for|to use for)\s*([\w\s]+)", user_input, re.IGNORECASE)
-        purpose = purpose_match.group(1).strip() if purpose_match else None
-        
-        return item, budget, intent, purpose
-    return None, None, intent, None
+def extract_details(user_input): #extract details
+    intent = "purchase_request" if any(keyword in user_input.lower() for keyword in [
+        "need", "buy", "purchase", "want", "get", "order", "search", "look", "list"
+    ]) else "general_query"
+
+    item_match = re.search(
+        r"(?:I need|I want|buy|get|purchase|order|search|list|look)\s*(?:a|an)?\s*([\w\s]+?)(?=\s*(?:under|below|less than|between|more than|around|equal|cheap|for|to use for|with|delivered|by|in|$)|\s*$)",
+        user_input, re.IGNORECASE)
+    item = item_match.group(1).strip() if item_match else ""
+
+    budget_match = re.search(
+        r"(?:under|below|less than|for|more than|between|around|equal)\s*\$?(\d+\.?\d*)",
+        user_input, re.IGNORECASE)
+    budget = float(budget_match.group(1)) if budget_match else None
+
+    # Improved purpose extraction: gets phrase after 'for' up to next keyword or end
+    purpose_match = re.search(
+        r"for ([\w\s]+?)(?= under|\$|,| with| delivered| by| in|\.|$)", 
+        user_input, re.IGNORECASE)
+    purpose = purpose_match.group(1).strip() if purpose_match else None
+
+    # Improved brand extraction: also matches brand names in the item phrase
+    brand_match = re.search(
+        r"(?:brand|by|from)\s*([\w\s]+?)(?=\s*(?:with|delivered|by|in|$)|\s*$)", user_input, re.IGNORECASE)
+    brand = brand_match.group(1).strip() if brand_match else None
+    if not brand:
+        # Try to extract brand from item phrase if present (e.g., "Steelcase office chair")
+        known_brands = ["Steelcase", "Herman Miller", "IKEA", "Logitech", "Razer", "Dell", "Samsung", "Apple", "Lenovo", "Uplift"]
+        for b in known_brands:
+            if b.lower() in user_input.lower():
+                brand = b
+                break
+
+    # Improved features extraction: gets phrase after 'with' or 'featuring'
+    features_match = re.search(
+        r"(?:with|featuring|features)\s*([\w\s,]+?)(?=\s*(?:delivered|by|in|\.|$)|\s*$)",
+        user_input, re.IGNORECASE)
+    features = features_match.group(1).strip() if features_match else None
+    if not features:
+        # Try to extract features from item phrase if present (e.g., "ergonomic office chair")
+        feature_keywords = ["ergonomic", "lumbar support", "adjustable height", "mesh", "reclining", "portable", "wireless", "mechanical", "RGB", "backlit"]
+        found_features = [f for f in feature_keywords if f in user_input.lower()]
+        if found_features:
+            features = ", ".join(found_features)
+
+    delivery_match = re.search(
+        r"(?:delivered (?:within|in|by)|need (?:it )?in|delivery (?:in|by|within)|arrive (?:in|by|within)|as soon as possible|urgent|quick delivery)\s*([\w\- ]+)",
+        user_input, re.IGNORECASE)
+    if delivery_match:
+        delivery_time = delivery_match.group(1).strip()
+        if "as soon as possible" in user_input.lower() or "urgent" in user_input.lower() or "quick delivery" in user_input.lower():
+            delivery_time = "ASAP"
+    else:
+        delivery_time = None
+
+    return item, budget, intent, purpose, delivery_time, brand, features
 
 def check_clarity(context):
     required_slots = ["budget", "purpose", "brand", "features", "urgency"]
@@ -284,15 +325,22 @@ def submit_request():
                 "context": context
             })
 
+
     # Extract details from new input only if no current slot is being clarified
     if not current_slot:
-        item, budget, intent, purpose = extract_details(user_input)
+        item, budget, intent, purpose, delivery_time, brand, features = extract_details(user_input)
         if item and not context["item"]:
             context["item"] = item
         if budget and not context["budget"]:
             context["budget"] = budget
         if purpose and not context["purpose"]:
             context["purpose"] = purpose
+        if delivery_time and not context["urgency"]:
+            context["urgency"] = delivery_time
+        if brand and not context["brand"]:
+            context["brand"] = brand
+        if features and not context["features"]:
+            context["features"] = features
         if intent:
             sessions[session_id]["history"].append({
                 "user": user_input,
